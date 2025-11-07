@@ -1,5 +1,10 @@
 {
+  "_comment": "Qwen Image Edit Single-Image Workflow",
+  "_description": "This workflow performs prompt-guided image editing using a single input image. Handler.py modifies nodes 78 (image input), 128/129 (dimensions), 111 (positive prompt), 110 (negative prompt), and 3 (seed/steps/cfg).",
+  "_image_flow": "Node 78 (LoadImage) -> Node 127 (Resize) -> Node 111/110 (Text Encoding) -> Node 3 (KSampler) -> Node 8 (VAEDecode) -> Node 60 (SaveImage)",
+
   "3": {
+    "_comment": "KSampler: Main sampling node that generates the edited image. Uses euler sampler with simple scheduler. Official defaults: steps=40, cfg=4.0 (true_cfg_scale). Lightning mode uses steps=4.",
     "inputs": {
       "seed": 954812286882415,
       "steps": 40,
@@ -115,6 +120,7 @@
     }
   },
   "78": {
+    "_comment": "LoadImage: Loads the input image. Handler.py sets this to the image_path/image_url/image_base64 provided by user.",
     "inputs": {
       "image": "result_25vrrfgn6x.png"
     },
@@ -124,6 +130,7 @@
     }
   },
   "89": {
+    "_comment": "LoraLoaderModelOnly: Loads Qwen-Image-Lightning-4steps LoRA for fast generation. This is always loaded but only effective when steps=4 (Lightning mode).",
     "inputs": {
       "lora_name": "Qwen-Image-Lightning-4steps-V1.0.safetensors",
       "strength_model": 1,
@@ -138,6 +145,7 @@
     }
   },
   "110": {
+    "_comment": "TextEncodeQwenImageEditPlus (Negative): Encodes negative prompt with image context. Handler.py sets prompt (default: single space ' '). Official Qwen recommendation: use single space, not empty string.",
     "inputs": {
       "prompt": " ",
       "clip": [
@@ -159,6 +167,7 @@
     }
   },
   "111": {
+    "_comment": "TextEncodeQwenImageEditPlus (Positive): Encodes editing prompt with image context. Handler.py sets this to user's prompt. This is the main control for what edits to apply.",
     "inputs": {
       "prompt": "put her hands up",
       "clip": [
@@ -180,6 +189,7 @@
     }
   },
   "112": {
+    "_comment": "EmptySD3LatentImage: Creates empty latent space with specified dimensions. Gets width/height from nodes 128/129.",
     "inputs": {
       "width": [
         "128",
@@ -197,6 +207,7 @@
     }
   },
   "127": {
+    "_comment": "ImageResizeKJv2: Resizes input image to target dimensions. Uses 'stretch' mode to ensure exact dimensions. Dimensions from nodes 128/129 (handler.py sets these).",
     "inputs": {
       "width": [
         "128",
@@ -224,6 +235,7 @@
     }
   },
   "128": {
+    "_comment": "INTConstant (width): Width value for output image. Handler.py sets this (default: 1024, range: 512-2048, must be multiple of 8).",
     "inputs": {
       "value": 720
     },
@@ -233,6 +245,7 @@
     }
   },
   "129": {
+    "_comment": "INTConstant (height): Height value for output image. Handler.py sets this (default: 1024, range: 512-2048, must be multiple of 8).",
     "inputs": {
       "value": 1280
     },

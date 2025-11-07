@@ -1,5 +1,12 @@
 {
+  "_comment": "Qwen Image Edit Dual-Image Workflow (Person/Object Swap)",
+  "_description": "This workflow performs prompt-guided image editing using TWO input images. Handler.py modifies nodes 78 (image1/DONOR), 123 (image2/CANVAS), 128/129 (dimensions), 111 (positive prompt), 110 (negative prompt), and 3 (seed/steps/cfg).",
+  "_image_roles": "CRITICAL: Image 1 (node 78) = DONOR (source of elements to transfer), Image 2 (node 123) = CANVAS (base that receives edits). Per official Qwen documentation.",
+  "_image_flow": "Node 78 (LoadImage1/DONOR) -> Node 127 (Resize1) -> Node 111/110 (Text Encoding with BOTH images) -> Node 3 (KSampler) -> Node 8 (VAEDecode) -> Node 60 (SaveImage)",
+  "_example_prompt": "Replace the person in the second image with the person in the first image while keeping the background of the second image the same.",
+
   "3": {
+    "_comment": "KSampler: Main sampling node that generates the edited image. Uses euler sampler with simple scheduler. Official defaults: steps=40, cfg=4.0 (true_cfg_scale). Lightning mode uses steps=4.",
     "inputs": {
       "seed": 954812286882415,
       "steps": 40,
@@ -115,6 +122,7 @@
     }
   },
   "78": {
+    "_comment": "LoadImage (Image 1 - DONOR): Loads the FIRST image = DONOR (source of elements to transfer). Handler.py sets this to image_path/image_url/image_base64. This is the image you want to EXTRACT elements FROM (person, outfit, object, etc.).",
     "inputs": {
       "image": "result_25vrrfgn6x.png"
     },
@@ -124,6 +132,7 @@
     }
   },
   "89": {
+    "_comment": "LoraLoaderModelOnly: Loads Qwen-Image-Lightning-4steps LoRA for fast generation. This is always loaded but only effective when steps=4 (Lightning mode).",
     "inputs": {
       "lora_name": "Qwen-Image-Lightning-4steps-V1.0.safetensors",
       "strength_model": 1,
@@ -138,6 +147,7 @@
     }
   },
   "110": {
+    "_comment": "TextEncodeQwenImageEditPlus (Negative): Encodes negative prompt with BOTH images. Receives image1 (DONOR) and image2 (CANVAS). Handler.py sets prompt (default: single space ' '). Official Qwen recommendation: use single space, not empty string.",
     "inputs": {
       "prompt": " ",
       "clip": [
@@ -163,6 +173,7 @@
     }
   },
   "111": {
+    "_comment": "TextEncodeQwenImageEditPlus (Positive): Encodes editing prompt with BOTH images. Receives image1 (DONOR from node 127) and image2 (CANVAS from node 130). Handler.py sets this to user's prompt. Example: 'Replace the person in the second image with the person in the first image...'",
     "inputs": {
       "prompt": "put her hands up",
       "clip": [
@@ -188,6 +199,7 @@
     }
   },
   "112": {
+    "_comment": "EmptySD3LatentImage: Creates empty latent space with specified dimensions. Gets width/height from nodes 128/129.",
     "inputs": {
       "width": [
         "128",
@@ -205,6 +217,7 @@
     }
   },
   "123": {
+    "_comment": "LoadImage (Image 2 - CANVAS): Loads the SECOND image = CANVAS (base that receives edits). Handler.py sets this to image_path_2/image_url_2/image_base64_2. This is the image whose BACKGROUND/SCENE will be PRESERVED while receiving elements from Image 1.",
     "inputs": {
       "image": "result_25vrrfgn6x.png"
     },
@@ -214,6 +227,7 @@
     }
   },
   "127": {
+    "_comment": "ImageResizeKJv2 (Image 1 Resize): Resizes DONOR image (from node 78) to target dimensions. Uses 'stretch' mode to ensure exact dimensions match. Both images must have same dimensions for dual-image encoding.",
     "inputs": {
       "width": [
         "128",
@@ -241,6 +255,7 @@
     }
   },
   "128": {
+    "_comment": "INTConstant (width): Width value for output image. Handler.py sets this (default: 1024, range: 512-2048, must be multiple of 8). Both images are resized to this width.",
     "inputs": {
       "value": 720
     },
@@ -250,6 +265,7 @@
     }
   },
   "129": {
+    "_comment": "INTConstant (height): Height value for output image. Handler.py sets this (default: 1024, range: 512-2048, must be multiple of 8). Both images are resized to this height.",
     "inputs": {
       "value": 1280
     },
@@ -259,6 +275,7 @@
     }
   },
   "130": {
+    "_comment": "ImageResizeKJv2 (Image 2 Resize): Resizes CANVAS image (from node 123) to target dimensions. Uses 'stretch' mode to match Image 1's dimensions exactly. This ensures both images have identical dimensions for dual-image encoding in nodes 110/111.",
     "inputs": {
       "width": [
         "128",

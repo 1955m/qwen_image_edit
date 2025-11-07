@@ -23,11 +23,13 @@ This Qwen Image Edit template is primarily designed for **Engui Studio**, a comp
 
 ## ✨ Key Features
 
-*   **Prompt-Guided Image Editing**: Edit images based on a text prompt.
+*   **Prompt-Guided Image Editing**: Edit images based on a text prompt using Qwen-Image-Edit-2509 model.
 *   **One or Two Input Images**: Automatically selects single- or dual-image workflow.
 *   **Flexible Inputs**: Provide images via file path, URL, or Base64 string.
-*   **Customizable Parameters**: Control seed, width, height, and prompt.
+*   **Customizable Parameters**: Official Qwen parameters (seed, width, height, steps, cfg, negative_prompt).
+*   **Lightning Mode**: Fast generation using Qwen-Image-Lightning-4steps (4 steps instead of 40).
 *   **ComfyUI Integration**: Built on top of ComfyUI for flexible workflow management.
+*   **Python Client Library**: Easy-to-use S3 client for batch processing and automation.
 
 ## 🚀 RunPod Serverless Template
 
@@ -38,22 +40,65 @@ This template includes all the necessary components to run Qwen Image Edit as a 
 *   **entrypoint.sh**: Performs initialization tasks when the worker starts.
 *   **qwen_image_edit_1.json / qwen_image_edit_2.json**: ComfyUI workflows for single- or dual-image editing.
 
-### Input
+## 🎨 Understanding Image Roles in Dual-Image Workflow
+
+**IMPORTANT**: When using two images, understanding the role of each image is critical for achieving expected results.
+
+### Image Role Convention (Official Qwen Documentation)
+
+According to the [official Qwen-Image-Edit-2509 documentation](https://huggingface.co/Qwen/Qwen-Image-Edit-2509):
+
+- **Image 1 (`image_path`)** = **DONOR**: Source of elements to transfer (person, outfit, object, etc.)
+- **Image 2 (`image_path_2`)** = **CANVAS**: Base image that receives edits (background/scene remains)
+
+### Practical Example: Person Swap
+
+To swap a person from Photo A into the scene from Photo B:
+
+```json
+{
+  "input": {
+    "image_path": "/path/to/photo_a.jpg",     // DONOR: person to extract
+    "image_path_2": "/path/to/photo_b.jpg",   // CANVAS: scene/background to keep
+    "prompt": "Replace the person in the second image with the person in the first image while keeping the background of the second image the same.",
+    "seed": 12345,
+    "width": 1024,
+    "height": 1024
+  }
+}
+```
+
+**Result**: Person from Photo A appears in the scene from Photo B (Photo B's background is preserved).
+
+### Common Use Cases
+
+1. **Person Swap**: Extract person from Image 1, place into scene from Image 2
+2. **Outfit Transfer**: Extract outfit from Image 1, apply to person in Image 2
+3. **Object Placement**: Extract object from Image 1, place into scene from Image 2
+4. **Style Transfer**: Transfer artistic style from Image 1 to content in Image 2
+
+---
+
+### Input Parameters
 
 The `input` object must contain the following fields. Image inputs support **URL, file path, or Base64 encoded string**.
 
 | Parameter | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
-| `prompt` | `string` | **Yes** | `N/A` | Text prompt that guides the edit. |
-| `image_path` or `image_url` or `image_base64` | `string` | **Yes** | `N/A` | First image input (path/URL/Base64). |
-| `image_path_2` or `image_url_2` or `image_base64_2` | `string` | No | `N/A` | Optional second image input (path/URL/Base64). Enables dual-image workflow. |
-| `seed` | `integer` | **Yes** | `N/A` | Random seed for deterministic output. |
-| `width` | `integer` | **Yes** | `N/A` | Output image width in pixels. |
-| `height` | `integer` | **Yes** | `N/A` | Output image height in pixels. |
+| `prompt` | `string` | **Yes** | `N/A` | Text prompt that guides the edit. **Must clearly specify image roles.** |
+| `image_path` or `image_url` or `image_base64` | `string` | **Yes** | `N/A` | First image (DONOR - source of elements). |
+| `image_path_2` or `image_url_2` or `image_base64_2` | `string` | No | `N/A` | Second image (CANVAS - base that receives edits). Enables dual-image workflow. |
+| `seed` | `integer` | No | `12345` | Random seed for deterministic output. |
+| `width` | `integer` | No | `1024` | Output image width in pixels (512-2048, multiple of 8). |
+| `height` | `integer` | No | `1024` | Output image height in pixels (512-2048, multiple of 8). |
+| `steps` | `integer` | No | `40` | Number of inference steps. Use `4` for Lightning mode (faster, slightly lower quality). |
+| `cfg` | `float` | No | `4.0` | CFG scale / true_cfg_scale (official default: 4.0). Controls editing strength. |
+| `negative_prompt` | `string` | No | `" "` | Negative prompt (official default: single space `" "`). |
 
-Notes:
-- Guidance is not used by the current handler.
+**Notes**:
 - If any of the `*_2` fields are provided, the dual-image workflow is selected automatically.
+- Official parameters from Qwen-Image-Edit-2509: `steps=40`, `cfg=4.0`, `negative_prompt=" "` (single space).
+- Lightning mode LoRA (`Qwen-Image-Lightning-4steps`) is included for faster generation.
 
 **Request Example (single image via URL):**
 
@@ -134,8 +179,79 @@ If the job fails, it returns a JSON object containing an error message.
 
 ## 🛠️ Usage and API Reference
 
+### Method 1: Direct API Calls
+
 1.  Create a Serverless Endpoint on RunPod based on this repository.
 2.  Once the build is complete and the endpoint is active, submit jobs via HTTP POST requests according to the API Reference above.
+
+### Method 2: Python Client Library (Recommended)
+
+The **`qwen_image_edit_s3_client.py`** provides a high-level Python API for easy integration:
+
+```python
+from qwen_image_edit_s3_client import QwenImageEditS3Client
+
+# Initialize client
+client = QwenImageEditS3Client(
+    runpod_endpoint_id="your-endpoint-id",
+    runpod_api_key="your-api-key",
+    s3_endpoint_url="https://s3api-eu-ro-1.runpod.io/",
+    s3_access_key_id="your-s3-key",
+    s3_secret_access_key="your-s3-secret",
+    s3_bucket_name="your-bucket",
+    s3_region="eu-ro-1"
+)
+
+# Example 1: Single image edit
+result = client.edit_single_image(
+    image_path="./photo.jpg",
+    prompt="change hair color to blonde, add sunglasses",
+    seed=12345,
+    width=1024,
+    height=1024
+)
+
+if result.get('status') == 'COMPLETED':
+    client.save_image_result(result, "./output.png")
+
+# Example 2: Dual image edit (person swap)
+# Note: Image 1 = DONOR (source), Image 2 = CANVAS (base)
+result = client.edit_dual_image(
+    image_path="./person_a.jpg",  # DONOR: person to extract
+    image_path_2="./scene_b.jpg",  # CANVAS: scene to keep
+    prompt="Replace the person in the second image with the person in the first image while keeping the background of the second image the same.",
+    seed=12345,
+    width=1024,
+    height=1024
+)
+
+if result.get('status') == 'COMPLETED':
+    client.save_image_result(result, "./person_swap.png")
+
+# Example 3: Lightning mode (fast generation - 4 steps)
+result = client.edit_single_image(
+    image_path="./photo.jpg",
+    prompt="make it vintage style",
+    use_lightning=True  # Automatically uses 4 steps instead of 40
+)
+
+# Example 4: Batch processing
+batch_result = client.batch_edit_images(
+    image_folder_path="./input_images",
+    output_folder_path="./output",
+    prompt="enhance image quality",
+    use_lightning=True
+)
+print(f"Processed: {batch_result['successful']}/{batch_result['total_files']}")
+```
+
+**Client Features**:
+- ✅ Automatic S3 upload handling
+- ✅ Job submission and status polling
+- ✅ Built-in Lightning mode support
+- ✅ Batch processing capabilities
+- ✅ Clear documentation of image roles
+- ✅ Comprehensive error handling
 
 ### 📁 Using Network Volumes
 
