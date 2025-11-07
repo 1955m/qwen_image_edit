@@ -2,8 +2,8 @@
   "3": {
     "inputs": {
       "seed": 954812286882415,
-      "steps": 4,
-      "cfg": 1,
+      "steps": 40,
+      "cfg": 4,
       "sampler_name": "euler",
       "scheduler": "simple",
       "denoise": 1,
@@ -139,7 +139,7 @@
   },
   "110": {
     "inputs": {
-      "prompt": "",
+      "prompt": " ",
       "clip": [
         "38",
         0

@@ -228,10 +228,19 @@ def handler(job):
 
     prompt["111"]["inputs"]["prompt"] = job_input["prompt"]
 
+    # Extract parameters with defaults matching official Qwen-Image-Edit-2509 docs
+    prompt["3"]["inputs"]["seed"] = job_input.get("seed", 12345)
+    prompt["128"]["inputs"]["value"] = job_input.get("width", 1024)
+    prompt["129"]["inputs"]["value"] = job_input.get("height", 1024)
 
-    prompt["3"]["inputs"]["seed"] = job_input["seed"]
-    prompt["128"]["inputs"]["value"] = job_input["width"]
-    prompt["129"]["inputs"]["value"] = job_input["height"]
+    # Official doc parameters:
+    # - num_inference_steps: 40 (default)
+    # - true_cfg_scale: 4.0 (primary control for editing strength)
+    # - guidance_scale: 1.0 (secondary control, not typically needed in ComfyUI)
+    # - negative_prompt: " " (single space)
+    prompt["3"]["inputs"]["steps"] = job_input.get("steps", 40)
+    prompt["3"]["inputs"]["cfg"] = job_input.get("cfg", 4.0)  # Maps to true_cfg_scale
+    prompt["110"]["inputs"]["prompt"] = job_input.get("negative_prompt", " ")
 
     ws_url = f"ws://{server_address}:8188/ws?clientId={client_id}"
     logger.info(f"Connecting to WebSocket: {ws_url}")
